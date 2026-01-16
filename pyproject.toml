@@ -1,0 +1,22 @@
+[project]
+name = "auth-service"
+version = "0.1.0"
+description = "Authentication microservice with Google OAuth 2.0 and JWT"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 88
+exclude = [
+  ".git",
+  ".venv",
+  "build",
+  "dist",
+  "tests/data",
+  "notes",
+  "__pycache__"
+]
+
+[tool.ruff.isort]
+known-first-party = ["src"]
+
+

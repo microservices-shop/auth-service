@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+itsdangerous
+
+sqlalchemy[asyncio]
+asyncpg
+alembic
+
+authlib
+PyJWT[crypto]
+httpx
+
+pydantic
+pydantic-settings
+email-validator
+
+pre-commit
