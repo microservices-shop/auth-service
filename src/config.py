@@ -27,5 +27,29 @@ class Settings(BaseSettings):
             f"{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
 
+    # JWT settings
+    JWT_SECRET_KEY: str = ""
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+
+    # Google OAuth settings
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = ""
+
+    # Frontend URL for redirects after OAuth
+    FRONTEND_URL: str = "http://localhost:3000"
+
+    # Cookie settings
+    COOKIE_SECURE: bool = False  # Set to True in production (HTTPS)
+    COOKIE_SAMESITE: str = "lax"
+
+    # CORS settings
+    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+
+    # Session settings (for OAuth state)
+    SESSION_SECRET_KEY: str = ""
+
 
 settings = Settings()
