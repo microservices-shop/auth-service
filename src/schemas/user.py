@@ -19,10 +19,7 @@ class UserCreateSchema(BaseModel):
         ...,
         description="Уникальный идентификатор из Google OAuth",
     )
-    picture_url: HttpUrl | None = Field(
-        None,
-        description="URL аватара пользователя",
-    )
+    picture_url: HttpUrl = Field(description="URL аватара пользователя")
     role: UserRole = Field(UserRole.USER, description="Роль пользователя в системе")
 
     model_config = ConfigDict(from_attributes=True)

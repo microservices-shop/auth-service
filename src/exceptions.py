@@ -29,3 +29,10 @@ class UserNotFoundException(AuthServiceException):
 class RefreshTokenRevokedException(AuthServiceException):
     status_code = status.HTTP_401_UNAUTHORIZED
     detail = "Refresh token has been revoked"
+
+
+class OAuthAuthenticationException(AuthServiceException):
+    """Вызывается при ошибках авторизации через внешних провайдеров (Google)."""
+
+    status_code = status.HTTP_400_BAD_REQUEST
+    detail = "External authentication failed"
