@@ -29,13 +29,13 @@ class GoogleOAuthClient:
     def __init__(self):
         self._client = oauth.google
 
-    async def get_authorization_url(
-        self, request: Request, redirect_uri: str
-    ) -> RedirectResponse:
+    async def get_authorization_url(self, request: Request) -> RedirectResponse:
         """
         Создает объект RedirectResponse для перенаправления пользователя на страницу Google.
         """
-        return await self._client.authorize_redirect(request, redirect_uri)
+        return await self._client.authorize_redirect(
+            request, settings.GOOGLE_REDIRECT_URI
+        )
 
     async def authorize_access_token(self, request: Request) -> dict:
         """
@@ -56,7 +56,7 @@ class GoogleOAuthClient:
 
     def get_user_info(self, token: dict) -> GoogleUserSchema:
         """
-        Извлекает информацию о пользователе из ответа Google.
+        Распаковывает и типизирует данные пользователя из id_token.
         """
         user_info = token.get("userinfo")
         if not user_info:

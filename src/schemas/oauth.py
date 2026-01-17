@@ -17,3 +17,24 @@ class GoogleUserSchema(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
     )
+
+
+class TokenResponseSchema(BaseModel):
+    """
+    Схема успешного ответа при выдаче JWT-токенов.
+
+    Используется для передачи данных авторизации клиенту. Access-токен
+    предназначен для передачи в заголовке Authorization (Bearer), а
+    время истечения позволяет фронтенду рассчитать момент для
+    автоматического обновления сессии.
+    """
+
+    access_token: str = Field(
+        ..., description="Краткосрочный JWT токен для аутентификации запросов к API"
+    )
+    token_type: str = Field(
+        default="Bearer", description="Схема аутентификации (всегда 'Bearer')"
+    )
+    expires_in: int = Field(..., description="Срок жизни access_token в секундах")
+
+    model_config = ConfigDict(from_attributes=True)

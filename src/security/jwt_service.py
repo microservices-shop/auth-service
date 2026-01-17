@@ -1,5 +1,5 @@
 import uuid
-from datetime import timedelta, datetime, timezone
+from datetime import datetime
 
 import jwt
 from jwt.exceptions import DecodeError, ExpiredSignatureError, InvalidTokenError
@@ -11,17 +11,19 @@ from src.exceptions import InvalidTokenException, ExpiredTokenException
 
 class JWTService:
     def create_access_token(
-        self, user_id: uuid.UUID | str, email: str, role: str
+        self,
+        user_id: uuid.UUID | str,
+        email: str,
+        role: str,
+        iat: datetime,
+        expires_at: datetime,
     ) -> str:
-        now = datetime.now(timezone.utc)
-        expires_at = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-
         payload = {
             "sub": str(user_id),
             "email": email,
             "role": role,
             "type": ACCESS_TOKEN_TYPE,
-            "iat": int(now.timestamp()),
+            "iat": int(iat.timestamp()),
             "exp": int(expires_at.timestamp()),
         }
 
@@ -29,15 +31,14 @@ class JWTService:
             payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
         )
 
-    def create_refresh_token(self, user_id: uuid.UUID | str) -> str:
-        now = datetime.now(timezone.utc)
-        expires_at = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-
+    def create_refresh_token(
+        self, user_id: uuid.UUID | str, iat: datetime, expires_at: datetime
+    ) -> str:
         payload = {
             "sub": str(user_id),
             "type": REFRESH_TOKEN_TYPE,
             "jti": str(uuid.uuid4()),
-            "iat": int(now.timestamp()),
+            "iat": int(iat.timestamp()),
             "exp": int(expires_at.timestamp()),
         }
 

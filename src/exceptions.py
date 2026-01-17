@@ -36,3 +36,10 @@ class OAuthAuthenticationException(AuthServiceException):
 
     status_code = status.HTTP_400_BAD_REQUEST
     detail = "External authentication failed"
+
+
+class RefreshTokenNotFoundException(AuthServiceException):
+    """Вызывается, когда refresh токен не найден в куках."""
+
+    status_code = status.HTTP_401_UNAUTHORIZED
+    detail = "Refresh token not found in cookies"
