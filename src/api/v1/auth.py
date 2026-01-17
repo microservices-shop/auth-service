@@ -116,3 +116,30 @@ async def refresh_tokens(
     )
 
     return token_response
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    refresh_token: RefreshTokenDep,
+    auth_service: AuthServiceDep,
+):
+    """Выход пользователя путем отзыва refresh токена.
+
+    Args:
+        refresh_token: Refresh токен из куки
+        auth_service: Зависимость сервиса аутентификации
+
+    Returns:
+        204 No Content
+    """
+    # Отзыв токена
+    await auth_service.logout(refresh_token)
+
+    # Очистка куки
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.delete_cookie(
+        key=REFRESH_TOKEN_COOKIE_NAME,
+        path=REFRESH_TOKEN_COOKIE_PATH,
+    )
+
+    return response

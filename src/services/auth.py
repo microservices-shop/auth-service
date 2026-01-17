@@ -11,6 +11,7 @@ from src.exceptions import (
     RefreshTokenRevokedException,
     ExpiredTokenException,
     UserNotFoundException,
+    RefreshTokenNotFoundException,
 )
 from src.repositories.refresh_token import RefreshTokenRepository
 from src.repositories.user import UserRepository
@@ -171,3 +172,22 @@ class AuthService:
         )
 
         return token_response, new_refresh_token
+
+    async def logout(self, refresh_token: str) -> None:
+        """Выход пользователя путем отзыва refresh токена.
+
+        Args:
+            refresh_token: Refresh токен для отзыва
+
+        Raises:
+            InvalidTokenException: Если токен не найден
+        """
+        # Проверка существования токена в базе данных
+        token_record = await self.token_repo.get_by_token(refresh_token)
+
+        if token_record is None:
+            raise RefreshTokenNotFoundException()
+
+        # Отзыв токена
+        await self.token_repo.revoke(refresh_token)
+        await self.session.commit()
