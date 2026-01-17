@@ -1,4 +1,5 @@
-from pydantic import BaseModel, EmailStr, Field, HttpUrl, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from src.schemas.user import UrlStr
 
 
 class GoogleUserSchema(BaseModel):
@@ -12,7 +13,7 @@ class GoogleUserSchema(BaseModel):
     )
     email: EmailStr = Field(...)
     name: str
-    picture_url: HttpUrl = Field(description="URL аватара пользователя")
+    picture_url: UrlStr = Field(description="URL аватара пользователя")
 
     model_config = ConfigDict(
         from_attributes=True,

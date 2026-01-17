@@ -1,7 +1,9 @@
-from typing import Optional
-
-from pydantic import BaseModel, EmailStr, Field, HttpUrl, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, HttpUrl, ConfigDict, AfterValidator
+from typing import Annotated, Optional
 from src.db.models import UserRole
+
+# Тип, который валидируется как URL, но преобразуется в строку
+UrlStr = Annotated[HttpUrl, AfterValidator(str)]
 
 
 class UserCreateSchema(BaseModel):
@@ -19,7 +21,7 @@ class UserCreateSchema(BaseModel):
         ...,
         description="Уникальный идентификатор из Google OAuth",
     )
-    picture_url: HttpUrl = Field(description="URL аватара пользователя")
+    picture_url: UrlStr = Field(description="URL аватара пользователя")
     role: UserRole = Field(UserRole.USER, description="Роль пользователя в системе")
 
     model_config = ConfigDict(from_attributes=True)
@@ -33,7 +35,7 @@ class UserUpdateSchema(BaseModel):
         description="Новое отображаемое имя",
         examples=["Александр"],
     )
-    picture_url: Optional[HttpUrl] = Field(
+    picture_url: Optional[UrlStr] = Field(
         None,
         description="Новый URL аватара пользователя",
     )
