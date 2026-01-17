@@ -1,17 +1,25 @@
+import uuid
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Header
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.database import async_session_maker
-from src.exceptions import RefreshTokenNotFoundException
+from src.exceptions import (
+    RefreshTokenNotFoundException,
+    AuthenticationRequiredException,
+    InvalidAuthorizationFormatException,
+    AuthorizationHeaderNotFoundException,
+)
 from src.schemas.client import ClientInfo
+from src.schemas.user import CurrentUserSchema
 from src.security.jwt_service import JWTService
 from src.security.oauth import GoogleOAuthClient
 from src.services.auth import AuthService
 
 from src.constants import REFRESH_TOKEN_COOKIE_NAME
+from src.services.user import UserService
 
 
 async def get_db() -> AsyncSession:
@@ -40,18 +48,6 @@ def get_auth_service(
 
 
 def get_refresh_token_from_cookie(request: Request) -> str:
-    """Извлекает refresh токен из куки.
-
-    Args:
-        request: Объект запроса FastAPI
-
-    Returns:
-        Строка refresh токена
-
-    Raises:
-        HTTPException: 401, если кука отсутствует
-    """
-
     token = request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
     if not token:
         raise RefreshTokenNotFoundException()
@@ -59,17 +55,11 @@ def get_refresh_token_from_cookie(request: Request) -> str:
 
 
 def get_client_info(request: Request) -> ClientInfo:
-    """Извлекает информацию о клиенте (User-Agent, IP).
-
-    Args:
-        request: Объект запроса FastAPI
-
-    Returns:
-        ClientInfo: Информация о клиенте
+    """
+    Извлекает информацию о клиенте (User-Agent, IP).
     """
     user_agent = request.headers.get("user-agent")
 
-    # Вся "грязная" логика теперь живет только здесь
     x_forwarded_for = request.headers.get("x-forwarded-for")
     if x_forwarded_for:
         ip_address = x_forwarded_for.split(",")[0].strip()
@@ -81,8 +71,99 @@ def get_client_info(request: Request) -> ClientInfo:
     return ClientInfo(user_agent=user_agent, ip_address=ip_address)
 
 
+JWTServiceDep = Annotated[JWTService, Depends(get_jwt_service)]
+
+
+def get_current_user_from_token(
+    jwt_service: JWTServiceDep,
+    authorization: str | None = Header(None),
+) -> CurrentUserSchema:
+    """Извлекает текущего пользователя из Bearer токена.
+
+    Args:
+        authorization: Заголовок Authorization с Bearer токеном
+        jwt_service: Зависимость сервиса JWT
+
+    Returns:
+        Словарь пользователя с id, email, role
+
+    Raises:
+        AuthorizationHeaderNotFoundException: если заголовок отсутствует
+        InvalidAuthorizationFormatException: если формат заголовка неверный
+        InvalidTokenException: если токен невалиден
+        ExpiredTokenException: если срок действия токена истек
+    """
+    if not authorization:
+        raise AuthorizationHeaderNotFoundException()
+
+    # Извлечение токена из "Bearer <token>"
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise InvalidAuthorizationFormatException()
+
+    token = parts[1]
+
+    payload = jwt_service.verify_access_token(token)
+    return CurrentUserSchema(
+        id=payload["sub"],
+        email=payload["email"],
+        role=payload["role"],
+    )
+
+
+def get_current_user(
+    request: Request,
+    jwt_service: JWTServiceDep,
+    authorization: str | None = Header(None),
+) -> CurrentUserSchema:
+    """Получает текущего пользователя из заголовков Gateway или Bearer токена.
+
+    Поддерживает два метода аутентификации:
+    1. Заголовки Gateway (X-User-ID, X-User-Email, X-User-Role)
+    2. Bearer токен в заголовке Authorization
+
+    Args:
+        request: Объект запроса FastAPI
+        authorization: Заголовок Authorization
+        jwt_service: Зависимость сервиса JWT
+
+    Returns:
+        Словарь пользователя с id, email, role
+
+    Raises:
+        HTTPException: 401, если аутентификация не удалась
+    """
+    # Сначала пробуем заголовки Gateway
+    user_id = request.headers.get("X-User-ID")
+    user_email = request.headers.get("X-User-Email")
+    user_role = request.headers.get("X-User-Role")
+
+    if user_id and user_email and user_role:
+        return CurrentUserSchema(
+            id=uuid.UUID(user_id),
+            email=user_email,
+            role=user_role,
+        )
+
+    # Резервный вариант — Bearer токен
+    if authorization:
+        return get_current_user_from_token(
+            authorization=authorization, jwt_service=jwt_service
+        )
+
+    raise AuthenticationRequiredException()
+
+
+def get_user_service(
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> UserService:
+    return UserService(session=session)
+
+
 SessionDep = Annotated[AsyncSession, Depends(get_db)]
 OAuthClientDep = Annotated[GoogleOAuthClient, Depends(get_oauth_client)]
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 RefreshTokenDep = Annotated[str, Depends(get_refresh_token_from_cookie)]
 ClientInfoDep = Annotated[ClientInfo, Depends(get_client_info)]
+CurrentUserDep = Annotated[CurrentUserSchema, Depends(get_current_user)]
+UserServiceDep = Annotated[UserService, Depends(get_user_service)]

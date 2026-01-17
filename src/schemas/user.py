@@ -1,3 +1,6 @@
+import uuid
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr, Field, HttpUrl, ConfigDict, AfterValidator
 from typing import Annotated, Optional
 from src.db.models import UserRole
@@ -27,6 +30,20 @@ class UserCreateSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class UserResponseSchema(BaseModel):
+    id: uuid.UUID = Field(..., description="Уникальный идентификатор пользователя")
+    email: EmailStr = Field(..., description="Адрес электронной почты пользователя")
+    name: str = Field(..., description="Отображаемое имя пользователя")
+    picture_url: UrlStr | None = Field(
+        None, description="URL фотографии профиля пользователя"
+    )
+    role: str = Field(..., description="Роль пользователя (guest, user, admin)")
+    is_active: bool = Field(..., description="Активен ли аккаунт пользователя")
+    created_at: datetime = Field(...)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class UserUpdateSchema(BaseModel):
     name: Optional[str] = Field(
         None,
@@ -35,9 +52,19 @@ class UserUpdateSchema(BaseModel):
         description="Новое отображаемое имя",
         examples=["Александр"],
     )
-    picture_url: Optional[UrlStr] = Field(
+    picture_url: UrlStr | None = Field(
         None,
         description="Новый URL аватара пользователя",
     )
 
     model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+
+class CurrentUserSchema(BaseModel):
+    """Схема текущего пользователя (используется в зависимостях)."""
+
+    id: uuid.UUID = Field(..., description="Уникальный идентификатор пользователя")
+    email: EmailStr = Field(..., description="Адрес электронной почты пользователя")
+    role: str = Field(..., description="Роль пользователя (guest, user, admin)")
+
+    model_config = ConfigDict(from_attributes=True)

@@ -62,7 +62,7 @@ class AuthService:
         else:
             update_schema = UserUpdateSchema(
                 name=google_user.name,
-                picture_url=google_user.picture,
+                picture_url=google_user.picture_url,
             )
             user = await self.user_repo.update(user.id, update_schema)
 

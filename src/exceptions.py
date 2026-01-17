@@ -43,3 +43,24 @@ class RefreshTokenNotFoundException(AuthServiceException):
 
     status_code = status.HTTP_401_UNAUTHORIZED
     detail = "Refresh token not found"
+
+
+class AuthorizationHeaderNotFoundException(AuthServiceException):
+    """Вызывается, когда заголовок Authorization отсутствует."""
+
+    status_code = status.HTTP_401_UNAUTHORIZED
+    detail = "Authorization header is missing"
+
+
+class InvalidAuthorizationFormatException(AuthServiceException):
+    """Вызывается, когда формат заголовка Authorization неверный."""
+
+    status_code = status.HTTP_401_UNAUTHORIZED
+    detail = "Invalid authorization header format"
+
+
+class AuthenticationRequiredException(AuthServiceException):
+    """Вызывается, когда требуется аутентификация."""
+
+    status_code = status.HTTP_401_UNAUTHORIZED
+    detail = "Authentication required (gateway headers or Bearer token)"
