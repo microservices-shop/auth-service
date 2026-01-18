@@ -42,7 +42,6 @@ class AuthService:
         Выполняет вход через Google OAuth: обменивает код на данные профиля,
         регистрирует или обновляет пользователя и генерирует токены.
         """
-        print(f"Параметры запроса: {request.query_params}")
         token = await self.oauth_client.authorize_access_token(request)
 
         google_user = self.oauth_client.get_user_info(token)
@@ -190,4 +189,13 @@ class AuthService:
 
         # Отзыв токена
         await self.token_repo.revoke(refresh_token)
+        await self.session.commit()
+
+    async def logout_all(self, user_id: uuid.UUID) -> None:
+        """Выход пользователя со всех устройств путем отзыва всех refresh токенов.
+
+        Args:
+            user_id: Уникальный идентификатор пользователя
+        """
+        await self.token_repo.revoke_all_for_user(user_id)
         await self.session.commit()

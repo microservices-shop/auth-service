@@ -1,12 +1,28 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field, HttpUrl, ConfigDict, AfterValidator
-from typing import Annotated, Optional
+from pydantic import (
+    BaseModel,
+    EmailStr,
+    Field,
+    HttpUrl,
+    ConfigDict,
+    BeforeValidator,
+    TypeAdapter,
+)
+from typing import Annotated, Optional, Any
 from src.db.models import UserRole
 
-# Тип, который валидируется как URL, но преобразуется в строку
-UrlStr = Annotated[HttpUrl, AfterValidator(str)]
+
+def validate_url(v: Any) -> str:
+    """Валидирует значение как URL и возвращает его в виде строки."""
+    if not v:
+        return v
+    return str(TypeAdapter(HttpUrl).validate_python(v))
+
+
+# Тип, который валидируется как URL, но хранится и сериализуется как строка
+UrlStr = Annotated[str, BeforeValidator(validate_url)]
 
 
 class UserCreateSchema(BaseModel):

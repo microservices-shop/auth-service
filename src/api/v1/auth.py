@@ -7,6 +7,7 @@ from src.api.dependencies import (
     AuthServiceDep,
     RefreshTokenDep,
     ClientInfoDep,
+    CurrentUserDep,
 )
 from src.config import settings
 from src.constants import (
@@ -120,12 +121,14 @@ async def refresh_tokens(
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
+    response: Response,
     refresh_token: RefreshTokenDep,
     auth_service: AuthServiceDep,
 ):
     """Выход пользователя путем отзыва refresh токена.
 
     Args:
+        response: Объект ответа FastAPI для очистки куки
         refresh_token: Refresh токен из куки
         auth_service: Зависимость сервиса аутентификации
 
@@ -136,10 +139,12 @@ async def logout(
     await auth_service.logout(refresh_token)
 
     # Очистка куки
-    response = Response(status_code=status.HTTP_204_NO_CONTENT)
     response.delete_cookie(
         key=REFRESH_TOKEN_COOKIE_NAME,
         path=REFRESH_TOKEN_COOKIE_PATH,
     )
 
-    return response
+
+@router.post("/logout-all", status_code=status.HTTP_204_NO_CONTENT)
+async def logout_all(current_user: CurrentUserDep, auth_service: AuthServiceDep):
+    await auth_service.logout_all(current_user.id)
