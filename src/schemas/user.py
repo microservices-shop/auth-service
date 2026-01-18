@@ -1,28 +1,9 @@
 import uuid
 from datetime import datetime
 
-from pydantic import (
-    BaseModel,
-    EmailStr,
-    Field,
-    HttpUrl,
-    ConfigDict,
-    BeforeValidator,
-    TypeAdapter,
-)
-from typing import Annotated, Optional, Any
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from typing import Optional
 from src.db.models import UserRole
-
-
-def validate_url(v: Any) -> str:
-    """Валидирует значение как URL и возвращает его в виде строки."""
-    if not v:
-        return v
-    return str(TypeAdapter(HttpUrl).validate_python(v))
-
-
-# Тип, который валидируется как URL, но хранится и сериализуется как строка
-UrlStr = Annotated[str, BeforeValidator(validate_url)]
 
 
 class UserCreateSchema(BaseModel):
@@ -40,7 +21,7 @@ class UserCreateSchema(BaseModel):
         ...,
         description="Уникальный идентификатор из Google OAuth",
     )
-    picture_url: UrlStr = Field(description="URL аватара пользователя")
+    picture_url: str = Field(description="URL аватара пользователя")
     role: UserRole = Field(UserRole.USER, description="Роль пользователя в системе")
 
     model_config = ConfigDict(from_attributes=True)
@@ -50,7 +31,7 @@ class UserResponseSchema(BaseModel):
     id: uuid.UUID = Field(..., description="Уникальный идентификатор пользователя")
     email: EmailStr = Field(..., description="Адрес электронной почты пользователя")
     name: str = Field(..., description="Отображаемое имя пользователя")
-    picture_url: UrlStr | None = Field(
+    picture_url: str | None = Field(
         None, description="URL фотографии профиля пользователя"
     )
     role: str = Field(..., description="Роль пользователя (guest, user, admin)")
@@ -68,7 +49,7 @@ class UserUpdateSchema(BaseModel):
         description="Новое отображаемое имя",
         examples=["Александр"],
     )
-    picture_url: UrlStr | None = Field(
+    picture_url: str | None = Field(
         None,
         description="Новый URL аватара пользователя",
     )
