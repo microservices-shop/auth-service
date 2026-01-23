@@ -1,25 +1,23 @@
 import uuid
 from typing import Annotated
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, HTTPException, status
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.database import async_session_maker
 from src.exceptions import (
-    RefreshTokenNotFoundException,
-    AuthenticationRequiredException,
-    InvalidAuthorizationFormatException,
-    AuthorizationHeaderNotFoundException,
+    InvalidTokenException,
+    ExpiredTokenException,
 )
 from src.schemas.client import ClientInfo
 from src.schemas.user import CurrentUserSchema
 from src.security.jwt_service import JWTService
 from src.security.oauth import GoogleOAuthClient
 from src.services.auth import AuthService
+from src.services.user import UserService
 
 from src.constants import REFRESH_TOKEN_COOKIE_NAME
-from src.services.user import UserService
 
 
 async def get_db() -> AsyncSession:
@@ -50,13 +48,21 @@ def get_auth_service(
 def get_refresh_token_from_cookie(request: Request) -> str:
     token = request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
     if not token:
-        raise RefreshTokenNotFoundException()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token not found",
+        )
     return token
 
 
 def get_client_info(request: Request) -> ClientInfo:
-    """
-    Извлекает информацию о клиенте (User-Agent, IP).
+    """Извлекает информацию о клиенте (User-Agent, IP).
+
+    Args:
+        request: Объект запроса FastAPI
+
+    Returns:
+        ClientInfo: Объект с user-agent и ip-адресом
     """
     user_agent = request.headers.get("user-agent")
 
@@ -88,22 +94,37 @@ def get_current_user_from_token(
         Словарь пользователя с id, email, role
 
     Raises:
-        AuthorizationHeaderNotFoundException: если заголовок отсутствует
-        InvalidAuthorizationFormatException: если формат заголовка неверный
-        InvalidTokenException: если токен невалиден
-        ExpiredTokenException: если срок действия токена истек
+        HTTPException: 401 Unauthorized, если токен невалиден, просрочен или отсутствует
     """
     if not authorization:
-        raise AuthorizationHeaderNotFoundException()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header is missing",
+        )
 
     # Извлечение токена из "Bearer <token>"
     parts = authorization.split()
     if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise InvalidAuthorizationFormatException()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header format",
+        )
 
     token = parts[1]
 
-    payload = jwt_service.verify_access_token(token)
+    try:
+        payload = jwt_service.verify_access_token(token)
+    except InvalidTokenException as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=e.detail,
+        )
+    except ExpiredTokenException as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=e.detail,
+        )
+
     return CurrentUserSchema(
         id=payload["sub"],
         email=payload["email"],
@@ -151,7 +172,10 @@ def get_current_user(
             authorization=authorization, jwt_service=jwt_service
         )
 
-    raise AuthenticationRequiredException()
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required (gateway headers or Bearer token)",
+    )
 
 
 def get_user_service(

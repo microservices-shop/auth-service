@@ -41,6 +41,18 @@ class AuthService:
         """
         Выполняет вход через Google OAuth: обменивает код на данные профиля,
         регистрирует или обновляет пользователя и генерирует токены.
+
+        Args:
+            request: Объект запроса FastAPI с кодом авторизации
+            user_agent: User-Agent клиента
+            ip_address: IP-адрес клиента
+
+        Returns:
+            str: Refresh токен
+
+        Raises:
+            OAuthAuthenticationException: Если аутентификация через Google не удалась
+            AuthServiceException: При внутренних ошибках сервиса
         """
         token = await self.oauth_client.authorize_access_token(request)
 

@@ -47,10 +47,10 @@ class JWTService:
         )
 
     def verify_access_token(self, token: str) -> dict:
-        payload = jwt.decode(
-            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
-        )
         try:
+            payload = jwt.decode(
+                token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+            )
             if payload.get("type") != ACCESS_TOKEN_TYPE:
                 raise InvalidTokenException("Token is not an access token")
 

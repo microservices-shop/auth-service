@@ -1,4 +1,4 @@
-from fastapi import APIRouter, status, Response
+from fastapi import APIRouter, status, Response, HTTPException
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 
@@ -14,6 +14,15 @@ from src.constants import (
     REFRESH_TOKEN_COOKIE_NAME,
     REFRESH_TOKEN_COOKIE_MAX_AGE,
     REFRESH_TOKEN_COOKIE_PATH,
+)
+from src.exceptions import (
+    AuthServiceException,
+    InvalidTokenException,
+    ExpiredTokenException,
+    RefreshTokenRevokedException,
+    UserNotFoundException,
+    RefreshTokenNotFoundException,
+    OAuthAuthenticationException,
 )
 from src.schemas.oauth import TokenResponseSchema
 
@@ -46,17 +55,32 @@ async def google_callback(
     Args:
         request: Объект запроса FastAPI с кодом авторизации
         auth_service: Зависимость сервиса аутентификации
+        client_info: Информация о клиенте (IP, User-Agent)
 
     Returns:
-        Ответ перенаправления на фронтенд с кукой refresh токена
-    """
+        RedirectResponse: Перенаправление на фронтенд с кукой refresh токена
 
-    # Аутентификация пользователя через Google OAuth
-    refresh_token = await auth_service.authenticate_google(
-        request=request,
-        user_agent=client_info.user_agent,
-        ip_address=client_info.ip_address,
-    )
+    Raises:
+        HTTPException: 400 Bad Request, если ошибка во внешнем провайдере
+        HTTPException: 500 Internal Server Error, если внутренняя ошибка авторизации
+    """
+    try:
+        # Аутентификация пользователя через Google OAuth
+        refresh_token = await auth_service.authenticate_google(
+            request=request,
+            user_agent=client_info.user_agent,
+            ip_address=client_info.ip_address,
+        )
+    except OAuthAuthenticationException as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=e.detail,
+        )
+    except AuthServiceException as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=e.detail,
+        )
 
     # Создание ответа перенаправления на фронтенд
     redirect_url = f"{settings.FRONTEND_URL}/auth/success"
@@ -91,19 +115,39 @@ async def refresh_tokens(
 
     Args:
         request: Объект запроса FastAPI
+        response: Объект ответа для установки куки
         refresh_token: Refresh токен из куки
         auth_service: Зависимость сервиса аутентификации
+        client_info: Информация о клиенте (IP, User-Agent)
 
     Returns:
-        TokenResponse с новым токеном доступа
-    """
+        TokenResponseSchema: Схема с новым токеном доступа
 
-    # Обновление токенов (с ротацией)
-    token_response, new_refresh_token = await auth_service.refresh_tokens(
-        refresh_token=refresh_token,
-        user_agent=client_info.user_agent,
-        ip_address=client_info.ip_address,
-    )
+    Raises:
+        HTTPException: 401 Unauthorized, если токен невалиден, просрочен или отозван
+    """
+    try:
+        # Обновление токенов (с ротацией)
+        token_response, new_refresh_token = await auth_service.refresh_tokens(
+            refresh_token=refresh_token,
+            user_agent=client_info.user_agent,
+            ip_address=client_info.ip_address,
+        )
+    except (
+        InvalidTokenException,
+        RefreshTokenRevokedException,
+        RefreshTokenNotFoundException,
+        ExpiredTokenException,
+    ) as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=e.detail,
+        )
+    except UserNotFoundException as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=e.detail,
+        )
 
     # Установка новой куки refresh токена
     response.set_cookie(
@@ -133,10 +177,19 @@ async def logout(
         auth_service: Зависимость сервиса аутентификации
 
     Returns:
-        204 No Content
+        None: Возвращает 204 No Content
+
+    Raises:
+        HTTPException: 401 Unauthorized, если токен не найден или невалиден
     """
-    # Отзыв токена
-    await auth_service.logout(refresh_token)
+    try:
+        # Отзыв токена
+        await auth_service.logout(refresh_token)
+    except (RefreshTokenNotFoundException, InvalidTokenException) as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=e.detail,
+        )
 
     # Очистка куки
     response.delete_cookie(

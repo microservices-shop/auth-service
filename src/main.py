@@ -1,10 +1,8 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from src.config import settings
-from src.exceptions import AuthServiceException
 from src.api.v1.router import router as v1_router
 
 app = FastAPI(
@@ -28,11 +26,6 @@ app.add_middleware(
 )
 
 app.include_router(v1_router)
-
-
-@app.exception_handler(AuthServiceException)
-async def auth_exception_handler(request: Request, exc: AuthServiceException):
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 @app.get("/health")
