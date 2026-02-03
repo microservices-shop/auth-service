@@ -1,4 +1,7 @@
 import uuid
+import structlog
+
+from src.logger import get_logger
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
@@ -18,6 +21,9 @@ from src.services.auth import AuthService
 from src.services.user import UserService
 
 from src.constants import REFRESH_TOKEN_COOKIE_NAME
+
+
+logger = get_logger(__name__)
 
 
 async def get_db() -> AsyncSession:
@@ -97,6 +103,7 @@ def get_current_user_from_token(
         HTTPException: 401 Unauthorized, если токен невалиден, просрочен или отсутствует
     """
     if not authorization:
+        logger.debug("auth_header_missing")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authorization header is missing",
@@ -105,6 +112,7 @@ def get_current_user_from_token(
     # Извлечение токена из "Bearer <token>"
     parts = authorization.split()
     if len(parts) != 2 or parts[0].lower() != "bearer":
+        logger.warning("auth_header_invalid_format")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authorization header format",
@@ -115,11 +123,13 @@ def get_current_user_from_token(
     try:
         payload = jwt_service.verify_access_token(token)
     except InvalidTokenException as e:
+        logger.warning("token_validation_failed", reason="invalid")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=e.detail,
         )
     except ExpiredTokenException as e:
+        logger.warning("token_validation_failed", reason="expired")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=e.detail,
@@ -160,17 +170,23 @@ def get_current_user(
     user_role = request.headers.get("X-User-Role")
 
     if user_id and user_email and user_role:
+        structlog.contextvars.bind_contextvars(user_id=user_id)
+        request.state.user_id = user_id
+        logger.debug("user_context_bound", source="gateway_headers", user_id=user_id)
         return CurrentUserSchema(
             id=uuid.UUID(user_id),
             email=user_email,
             role=user_role,
         )
 
-    # Резервный вариант — Bearer токен
     if authorization:
-        return get_current_user_from_token(
+        user = get_current_user_from_token(
             authorization=authorization, jwt_service=jwt_service
         )
+        structlog.contextvars.bind_contextvars(user_id=str(user.id))
+        request.state.user_id = str(user.id)
+        logger.debug("user_context_bound", source="bearer_token", user_id=str(user.id))
+        return user
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

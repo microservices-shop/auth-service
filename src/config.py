@@ -12,7 +12,20 @@ class Settings(BaseSettings):
         env_file=str(env_path), case_sensitive=True, extra="ignore"
     )
 
+    # Режим отладки приложения (ВАЖНО для безопасности!)
+    # Если True - пользователи ВИДЯТ полные traceback ошибок в HTTP-ответах (DevTools, на экране)
+    # Если False - пользователи видят только request_id, traceback остается ТОЛЬКО в логах на сервере
+    # Также контролирует: формат логов (цветной текст vs JSON)
+    # Development: True, Production: False (ОБЯЗАТЕЛЬНО!)
     DEBUG: bool = False
+
+    # Уровень детализации логирования на сервере (независим от DEBUG)
+    # Возможные значения: "DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL"
+    LOG_LEVEL: str = "INFO"
+
+    # Вывод SQL-запросов SQLAlchemy в консоль (независим от DEBUG)
+    # Если True - все SQL-запросы выводятся в консоль
+    DB_ECHO: bool = False
 
     DB_HOST: str = "localhost"
     DB_PORT: str = "5432"

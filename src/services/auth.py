@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
 from src.config import settings
+from src.logger import get_logger
 from src.constants import UserRole
 from src.exceptions import (
     InvalidTokenException,
@@ -20,6 +21,9 @@ from src.schemas.user import UserCreateSchema, UserUpdateSchema
 
 from src.security.oauth import GoogleOAuthClient
 from src.security.jwt_service import JWTService
+
+
+logger = get_logger(__name__)
 
 
 class AuthService:
@@ -54,13 +58,14 @@ class AuthService:
             OAuthAuthenticationException: Если аутентификация через Google не удалась
             AuthServiceException: При внутренних ошибках сервиса
         """
+        logger.info("google_oauth_started")
         token = await self.oauth_client.authorize_access_token(request)
-
         google_user = self.oauth_client.get_user_info(token)
 
         user = await self.user_repo.get_by_google_id(google_user.sub)
 
         if user is None:
+            logger.info("user_registering", email=google_user.email)
             user_schema = UserCreateSchema(
                 email=google_user.email,
                 name=google_user.name,
@@ -71,6 +76,7 @@ class AuthService:
 
             user = await self.user_repo.create(user_schema)
         else:
+            logger.info("user_profile_updating")
             update_schema = UserUpdateSchema(
                 name=google_user.name,
                 picture_url=google_user.picture_url,
@@ -95,6 +101,7 @@ class AuthService:
 
         await self.session.commit()
 
+        logger.info("user_authenticated")
         return refresh_token
 
     async def refresh_tokens(
@@ -116,6 +123,7 @@ class AuthService:
             RefreshTokenRevokedException: Если токен был отозван
             UserNotFoundException: Если пользователь не найден
         """
+        logger.info("token_refresh_started")
         # Проверка подписи JWT и декодирование
         payload = self.jwt_service.verify_refresh_token(refresh_token)
         user_id_str = payload.get("sub")
@@ -182,6 +190,7 @@ class AuthService:
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
 
+        logger.info("token_refreshed")
         return token_response, new_refresh_token
 
     async def logout(self, refresh_token: str) -> None:
@@ -202,6 +211,7 @@ class AuthService:
         # Отзыв токена
         await self.token_repo.revoke(refresh_token)
         await self.session.commit()
+        logger.info("token_revoked")
 
     async def logout_all(self, user_id: uuid.UUID) -> None:
         """Выход пользователя со всех устройств путем отзыва всех refresh токенов.
@@ -211,3 +221,4 @@ class AuthService:
         """
         await self.token_repo.revoke_all_for_user(user_id)
         await self.session.commit()
+        logger.info("all_tokens_revoked")
