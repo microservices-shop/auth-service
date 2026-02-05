@@ -34,7 +34,7 @@ class UserResponseSchema(BaseModel):
     picture_url: str | None = Field(
         None, description="URL фотографии профиля пользователя"
     )
-    role: str = Field(..., description="Роль пользователя (guest, user, admin)")
+    role: str = Field(..., description="Роль пользователя (user, admin)")
     is_active: bool = Field(..., description="Активен ли аккаунт пользователя")
     created_at: datetime = Field(...)
 
@@ -62,6 +62,6 @@ class CurrentUserSchema(BaseModel):
 
     id: uuid.UUID = Field(..., description="Уникальный идентификатор пользователя")
     email: EmailStr = Field(..., description="Адрес электронной почты пользователя")
-    role: str = Field(..., description="Роль пользователя (guest, user, admin)")
+    role: str = Field(..., description="Роль пользователя (user, admin)")
 
     model_config = ConfigDict(from_attributes=True)

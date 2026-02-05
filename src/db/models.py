@@ -10,7 +10,6 @@ from src.db.database import Base
 
 
 class UserRole(str, PyEnum):
-    GUEST = "guest"
     USER = "user"
     ADMIN = "admin"
 
