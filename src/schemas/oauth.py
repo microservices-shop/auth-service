@@ -12,7 +12,7 @@ class GoogleUserSchema(BaseModel):
     )
     email: EmailStr = Field(...)
     name: str
-    picture_url: str = Field(description="URL аватара пользователя")
+    picture_url: str | None = Field(None, description="URL аватара пользователя")
 
     model_config = ConfigDict(
         from_attributes=True,

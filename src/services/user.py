@@ -35,6 +35,17 @@ class UserService:
 
         return UserResponseSchema.model_validate(user)
 
+    async def exists(self, user_id: uuid.UUID) -> bool:
+        """Проверка существования пользователя по ID.
+
+        Args:
+            user_id: Уникальный идентификатор пользователя
+
+        Returns:
+            True если пользователь существует, False иначе
+        """
+        return await self.user_repo.exists(user_id)
+
     async def update_profile(
         self, user_id: uuid.UUID, data: UserUpdateSchema
     ) -> UserResponseSchema:

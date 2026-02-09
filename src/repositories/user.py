@@ -25,6 +25,19 @@ class UserRepository:
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
+    async def exists(self, user_id: uuid.UUID) -> bool:
+        """Проверка существования пользователя по ID.
+
+        Args:
+            user_id: UUID пользователя
+
+        Returns:
+            True если пользователь существует, False иначе
+        """
+        query = select(UserModel.id).where(UserModel.id == user_id)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none() is not None
+
     async def create(self, user_schema: UserCreateSchema) -> UserModel:
         user = UserModel(**user_schema.model_dump())
         self.session.add(user)
