@@ -222,7 +222,7 @@ auth-service/
 6. Выберите тип **Web application**
 7. Заполните поля:
    - **Authorized JavaScript origins**: `http://localhost:3000`
-   - **Authorized redirect URIs**: `http://localhost:8000/api/v1/auth/google/callback`
+   - **Authorized redirect URIs**: `http://localhost:8001/api/v1/auth/google/callback`
 8. Скопируйте **Client ID** и **Client Secret** в `.env`
 
 </details>
@@ -241,7 +241,7 @@ docker-compose -f docker-compose.dev.yml up -d
 alembic upgrade head
 
 # Запуск
-uvicorn src.main:app --reload --port 8000 --no-access-log
+uvicorn src.main:app --reload --port 8001 --no-access-log
 ```
 
 ### Быстрый запуск
@@ -253,8 +253,8 @@ docker-compose up --build -d
 ### API Documentation
 
 После запуска доступна документация:
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+- **Swagger UI**: http://localhost:8001/docs
+- **ReDoc**: http://localhost:8001/redoc
 
 ## 🔌 API Endpoints
 
