@@ -1,10 +1,15 @@
+import httpx
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 
 from src.config import settings
 from src.exceptions import AuthServiceException, OAuthAuthenticationException
+from src.logger import get_logger
 from src.schemas.oauth import GoogleUserSchema
+
+logger = get_logger(__name__)
+
 
 oauth = OAuth()
 
@@ -32,10 +37,21 @@ class GoogleOAuthClient:
     async def get_authorization_url(self, request: Request) -> RedirectResponse:
         """
         Создает объект RedirectResponse для перенаправления пользователя на страницу Google.
+
+        Raises:
+            OAuthAuthenticationException: Если не удалось подключиться к серверу Google.
         """
-        return await self._client.authorize_redirect(
-            request, settings.GOOGLE_REDIRECT_URI
-        )
+        try:
+            return await self._client.authorize_redirect(
+                request, settings.GOOGLE_REDIRECT_URI
+            )
+        except httpx.ConnectError as e:
+            logger.warning(
+                "google_oauth_connect_error", method="authorize_redirect", error=str(e)
+            )
+            raise OAuthAuthenticationException(
+                detail="Failed to connect to Google OAuth server. Please try again later."
+            )
 
     async def authorize_access_token(self, request: Request) -> dict:
         """
@@ -51,6 +67,15 @@ class GoogleOAuthClient:
                     detail="Failed to receive token from Google"
                 )
             return token
+        except httpx.ConnectError as e:
+            logger.warning(
+                "google_oauth_connect_error",
+                method="authorize_access_token",
+                error=str(e),
+            )
+            raise OAuthAuthenticationException(
+                detail="Failed to connect to Google OAuth server. Please try again later."
+            )
         except OAuthError as e:
             raise AuthServiceException(detail=f"Google OAuth error: {e.error}")
 

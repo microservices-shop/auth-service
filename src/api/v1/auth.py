@@ -35,8 +35,17 @@ async def google_login(request: Request, oauth_client: OAuthClientDep):
     Инициирует процесс авторизации через Google OAuth.
 
     Перенаправляет пользователя на страницу авторизации Google.
+
+    Raises:
+        HTTPException: 502 Bad Gateway, если не удалось подключиться к серверу Google.
     """
-    return await oauth_client.get_authorization_url(request)
+    try:
+        return await oauth_client.get_authorization_url(request)
+    except OAuthAuthenticationException as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=e.detail,
+        )
 
 
 @router.get(
