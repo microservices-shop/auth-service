@@ -5,11 +5,13 @@ services:
     env_file:
       - .env
     environment:
-      - DB_HOST=db
+      - DB_HOST=auth_db
     command: [ "alembic", "upgrade", "head" ]
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - shop_network
 
   app:
     build: .
@@ -17,12 +19,14 @@ services:
     env_file:
       - .env
     environment:
-      - DB_HOST=db
+      - DB_HOST=auth_db
     ports:
       - "8001:8001"
     depends_on:
       migrate:
         condition: service_completed_successfully
+    networks:
+      - shop_network
     restart: unless-stopped
 
   db:
@@ -43,7 +47,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - shop_network
     restart: unless-stopped
 
 volumes:
   db_data:
+
+
+networks:
+  shop_network:
+    external: true

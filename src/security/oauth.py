@@ -7,6 +7,7 @@ from src.config import settings
 from src.exceptions import AuthServiceException, OAuthAuthenticationException
 from src.logger import get_logger
 from src.schemas.oauth import GoogleUserSchema
+import asyncio
 
 logger = get_logger(__name__)
 
@@ -41,17 +42,28 @@ class GoogleOAuthClient:
         Raises:
             OAuthAuthenticationException: Если не удалось подключиться к серверу Google.
         """
-        try:
-            return await self._client.authorize_redirect(
-                request, settings.GOOGLE_REDIRECT_URI
-            )
-        except httpx.ConnectError as e:
-            logger.warning(
-                "google_oauth_connect_error", method="authorize_redirect", error=str(e)
-            )
-            raise OAuthAuthenticationException(
-                detail="Failed to connect to Google OAuth server. Please try again later."
-            )
+        max_retries = 3
+        base_delay = 1.0
+
+        for attempt in range(max_retries):
+            try:
+                return await self._client.authorize_redirect(
+                    request, settings.GOOGLE_REDIRECT_URI
+                )
+            except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+                logger.warning(
+                    "google_oauth_connect_error",
+                    method="authorize_redirect",
+                    attempt=attempt + 1,
+                    max_retries=max_retries,
+                    error=str(e),
+                )
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(base_delay * (2**attempt))
+                else:
+                    raise OAuthAuthenticationException(
+                        detail="Failed to connect to Google OAuth server after multiple attempts. Please try again later."
+                    )
 
     async def authorize_access_token(self, request: Request) -> dict:
         """
@@ -60,24 +72,33 @@ class GoogleOAuthClient:
         Raises:
             AuthServiceException: Если обмен не удался.
         """
-        try:
-            token = await self._client.authorize_access_token(request)
-            if not token:
-                raise OAuthAuthenticationException(
-                    detail="Failed to receive token from Google"
+        max_retries = 3
+        base_delay = 1.0
+
+        for attempt in range(max_retries):
+            try:
+                token = await self._client.authorize_access_token(request)
+                if not token:
+                    raise OAuthAuthenticationException(
+                        detail="Failed to receive token from Google"
+                    )
+                return token
+            except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+                logger.warning(
+                    "google_oauth_connect_error",
+                    method="authorize_access_token",
+                    attempt=attempt + 1,
+                    max_retries=max_retries,
+                    error=str(e),
                 )
-            return token
-        except httpx.ConnectError as e:
-            logger.warning(
-                "google_oauth_connect_error",
-                method="authorize_access_token",
-                error=str(e),
-            )
-            raise OAuthAuthenticationException(
-                detail="Failed to connect to Google OAuth server. Please try again later."
-            )
-        except OAuthError as e:
-            raise AuthServiceException(detail=f"Google OAuth error: {e.error}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(base_delay * (2**attempt))
+                else:
+                    raise OAuthAuthenticationException(
+                        detail="Failed to connect to Google OAuth server after multiple attempts. Please try again later."
+                    )
+            except OAuthError as e:
+                raise AuthServiceException(detail=f"Google OAuth error: {e.error}")
 
     def get_user_info(self, token: dict) -> GoogleUserSchema:
         """
