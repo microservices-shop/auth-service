@@ -17,7 +17,7 @@ from src.exceptions import (
 from src.repositories.refresh_token import RefreshTokenRepository
 from src.repositories.user import UserRepository
 from src.schemas.oauth import TokenResponseSchema
-from src.schemas.user import UserCreateSchema, UserUpdateSchema
+from src.schemas.user import UserCreateSchema
 
 from src.security.oauth import GoogleOAuthClient
 from src.security.jwt_service import JWTService
@@ -75,13 +75,6 @@ class AuthService:
             )
 
             user = await self.user_repo.create(user_schema)
-        else:
-            logger.info("user_profile_updating")
-            update_schema = UserUpdateSchema(
-                name=google_user.name,
-                picture_url=google_user.picture_url,
-            )
-            user = await self.user_repo.update(user.id, update_schema)
 
         now = datetime.now(timezone.utc)
         expires_at = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
