@@ -24,9 +24,15 @@ class RefreshTokenRevokedException(AuthServiceException):
 
 
 class OAuthAuthenticationException(AuthServiceException):
-    """Вызывается при ошибках авторизации через внешних провайдеров (Google)."""
+    """Вызывается при сетевых ошибках подключения к OAuth-провайдеру (Google)."""
 
     detail = "External authentication failed"
+
+
+class OAuthProviderException(AuthServiceException):
+    """Вызывается когда OAuth-провайдер (Google) вернул ошибку (например, access_denied)."""
+
+    detail = "OAuth provider returned an error"
 
 
 class RefreshTokenNotFoundException(AuthServiceException):

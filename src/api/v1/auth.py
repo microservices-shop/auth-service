@@ -15,21 +15,21 @@ from src.constants import (
     REFRESH_TOKEN_COOKIE_MAX_AGE,
     REFRESH_TOKEN_COOKIE_PATH,
 )
-from src.exceptions import (
-    AuthServiceException,
-    InvalidTokenException,
-    ExpiredTokenException,
-    RefreshTokenRevokedException,
-    UserNotFoundException,
-    RefreshTokenNotFoundException,
-    OAuthAuthenticationException,
-)
+from src.exceptions import UserNotFoundException
 from src.schemas.oauth import TokenResponseSchema
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-@router.get("/google", status_code=status.HTTP_302_FOUND)
+@router.get(
+    "/google",
+    status_code=status.HTTP_302_FOUND,
+    responses={
+        status.HTTP_502_BAD_GATEWAY: {
+            "description": "Ошибка подключения к серверу Google"
+        },
+    },
+)
 async def google_login(request: Request, oauth_client: OAuthClientDep):
     """
     Инициирует процесс авторизации через Google OAuth.
@@ -37,19 +37,26 @@ async def google_login(request: Request, oauth_client: OAuthClientDep):
     Перенаправляет пользователя на страницу авторизации Google.
 
     Raises:
-        HTTPException: 502 Bad Gateway, если не удалось подключиться к серверу Google.
+        OAuthAuthenticationException: 502 Bad Gateway, если не удалось подключиться к серверу Google.
     """
-    try:
-        return await oauth_client.get_authorization_url(request)
-    except OAuthAuthenticationException as e:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=e.detail,
-        )
+    return await oauth_client.get_authorization_url(request)
 
 
 @router.get(
-    "/google/callback", name="google_callback", status_code=status.HTTP_302_FOUND
+    "/google/callback",
+    name="google_callback",
+    status_code=status.HTTP_302_FOUND,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "Google вернул ошибку (например, access_denied)"
+        },
+        status.HTTP_502_BAD_GATEWAY: {
+            "description": "Сетевая ошибка подключения к Google"
+        },
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {
+            "description": "Внутренняя ошибка авторизации"
+        },
+    },
 )
 async def google_callback(
     request: Request,
@@ -70,26 +77,16 @@ async def google_callback(
         RedirectResponse: Перенаправление на фронтенд с кукой refresh токена
 
     Raises:
-        HTTPException: 400 Bad Request, если ошибка во внешнем провайдере
-        HTTPException: 500 Internal Server Error, если внутренняя ошибка авторизации
+        OAuthProviderException: 400 Bad Request, если Google вернул ошибку
+        OAuthAuthenticationException: 502 Bad Gateway, если сетевая ошибка
+        AuthServiceException: 500 Internal Server Error, если внутренняя ошибка
     """
-    try:
-        # Аутентификация пользователя через Google OAuth
-        refresh_token = await auth_service.authenticate_google(
-            request=request,
-            user_agent=client_info.user_agent,
-            ip_address=client_info.ip_address,
-        )
-    except OAuthAuthenticationException as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=e.detail,
-        )
-    except AuthServiceException as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=e.detail,
-        )
+    # Аутентификация пользователя через Google OAuth
+    refresh_token = await auth_service.authenticate_google(
+        request=request,
+        user_agent=client_info.user_agent,
+        ip_address=client_info.ip_address,
+    )
 
     # Создание ответа перенаправления на фронтенд
     redirect_url = f"{settings.FRONTEND_URL}/auth/success"
@@ -109,7 +106,15 @@ async def google_callback(
     return response
 
 
-@router.post("/refresh", status_code=status.HTTP_200_OK)
+@router.post(
+    "/refresh",
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Токен невалиден, просрочен или отозван, или пользователь не найден"
+        },
+    },
+)
 async def refresh_tokens(
     request: Request,
     response: Response,
@@ -133,7 +138,7 @@ async def refresh_tokens(
         TokenResponseSchema: Схема с новым токеном доступа
 
     Raises:
-        HTTPException: 401 Unauthorized, если токен невалиден, просрочен или отозван
+        HTTPException: 401 Unauthorized, если токен невалиден, просрочен, отозван или пользователь не найден
     """
     try:
         # Обновление токенов (с ротацией)
@@ -142,17 +147,9 @@ async def refresh_tokens(
             user_agent=client_info.user_agent,
             ip_address=client_info.ip_address,
         )
-    except (
-        InvalidTokenException,
-        RefreshTokenRevokedException,
-        RefreshTokenNotFoundException,
-        ExpiredTokenException,
-    ) as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=e.detail,
-        )
     except UserNotFoundException as e:
+        # Специальный случай: UserNotFoundException - 401 (не 404, как в глобальном хендлере),
+        # потому что отсутствие пользователя при обновлении токена - ошибка аутентификации
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=e.detail,
@@ -172,7 +169,13 @@ async def refresh_tokens(
     return token_response
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "Токен не найден или невалиден"},
+    },
+)
 async def logout(
     response: Response,
     refresh_token: RefreshTokenDep,
@@ -189,16 +192,11 @@ async def logout(
         None: Возвращает 204 No Content
 
     Raises:
-        HTTPException: 401 Unauthorized, если токен не найден или невалиден
+        RefreshTokenNotFoundException: 401 Unauthorized, если токен не найден
+        InvalidTokenException: 401 Unauthorized, если токен невалиден
     """
-    try:
-        # Отзыв токена
-        await auth_service.logout(refresh_token)
-    except (RefreshTokenNotFoundException, InvalidTokenException) as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=e.detail,
-        )
+    # Отзыв токена
+    await auth_service.logout(refresh_token)
 
     # Очистка куки
     response.delete_cookie(

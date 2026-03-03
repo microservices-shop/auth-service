@@ -1,14 +1,19 @@
-from fastapi import APIRouter, status, HTTPException
+from fastapi import APIRouter, status
 import uuid
 
 from src.api.dependencies import UserServiceDep
 from src.schemas.user import UserResponseSchema
-from src.exceptions import UserNotFoundException
 
 router = APIRouter(prefix="/users", tags=["Internal Users API"])
 
 
-@router.get("/{user_id}", status_code=status.HTTP_200_OK)
+@router.get(
+    "/{user_id}",
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Пользователь не найден"},
+    },
+)
 async def get_user_by_id(
     user_id: uuid.UUID,
     user_service: UserServiceDep,
@@ -26,15 +31,9 @@ async def get_user_by_id(
         UserResponseSchema с данными пользователя
 
     Raises:
-        HTTPException: 404 Not Found, если пользователь не найден
+        UserNotFoundException: 404 Not Found, если пользователь не найден
     """
-    try:
-        return await user_service.get_by_id(user_id)
-    except UserNotFoundException as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=e.detail,
-        )
+    return await user_service.get_by_id(user_id)
 
 
 @router.get("/{user_id}/exists", status_code=status.HTTP_200_OK)

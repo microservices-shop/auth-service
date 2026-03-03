@@ -4,7 +4,11 @@ from starlette.requests import Request
 from starlette.responses import RedirectResponse
 
 from src.config import settings
-from src.exceptions import AuthServiceException, OAuthAuthenticationException
+from src.exceptions import (
+    AuthServiceException,
+    OAuthAuthenticationException,
+    OAuthProviderException,
+)
 from src.logger import get_logger
 from src.schemas.oauth import GoogleUserSchema
 import asyncio
@@ -98,7 +102,7 @@ class GoogleOAuthClient:
                         detail="Failed to connect to Google OAuth server after multiple attempts. Please try again later."
                     )
             except OAuthError as e:
-                raise AuthServiceException(detail=f"Google OAuth error: {e.error}")
+                raise OAuthProviderException(detail=f"Google OAuth error: {e.error}")
 
     def get_user_info(self, token: dict) -> GoogleUserSchema:
         """
