@@ -1,5 +1,3 @@
-"""Сервис профиля пользователя с бизнес-логикой."""
-
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +27,25 @@ class UserService:
             UserNotFoundException: Если пользователь не найден
         """
         user = await self.user_repo.get_by_id(user_id)
+
+        if user is None:
+            raise UserNotFoundException()
+
+        return UserResponseSchema.model_validate(user)
+
+    async def get_by_email(self, email: str) -> UserResponseSchema:
+        """Получение пользователя по email.
+
+        Args:
+            email: Email пользователя
+
+        Returns:
+            UserResponseSchema с данными пользователя
+
+        Raises:
+            UserNotFoundException: Если пользователь не найден
+        """
+        user = await self.user_repo.get_by_email(email)
 
         if user is None:
             raise UserNotFoundException()

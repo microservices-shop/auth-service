@@ -55,3 +55,32 @@ async def check_user_exists(
     """
     exists = await user_service.exists(user_id)
     return {"exists": exists}
+
+
+@router.get(
+    "/by-email/{email}",
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Пользователь не найден"},
+    },
+)
+async def get_user_by_email(
+    email: str,
+    user_service: UserServiceDep,
+) -> UserResponseSchema:
+    """Получение пользователя по email для межсервисного взаимодействия.
+
+    Internal API эндпоинт для Product Service - SQLAdmin auth.
+    Не требует JWT токена, доступен только внутри Docker-сети.
+
+    Args:
+        email: Email пользователя
+        user_service: Зависимость сервиса пользователей
+
+    Returns:
+        UserResponseSchema с данными пользователя
+
+    Raises:
+        UserNotFoundException: 404 Not Found, если пользователь не найден
+    """
+    return await user_service.get_by_email(email)
