@@ -71,10 +71,26 @@ class GoogleOAuthClient:
 
     async def authorize_access_token(self, request: Request) -> dict:
         """
-        Обменивает полученный от Google код на токены (access_token, id_token).
+        Обменивает временный код (code), полученный от Google в callback-запросе,
+        на реальные токены доступа (библиотека под капотом автоматически парсит
+        полученный id_token и возвращает его содержимое в поле userinfo).
+
+        Пример возвращаемого словаря (dict):
+        {
+            'access_token': 'ya29...',      # Токен Google для доступа к его API (нам не нужен)
+            'id_token': 'eyJhbGci...',      # JWT с данными профиля пользователя
+            'userinfo': {                   # Расшифрованные данные из id_token
+                'sub': '102938...',         # Уникальный Google ID пользователя
+                'email': 'user@gmail.com',  # Email из Google-аккаунта
+                'name': 'Ivan Ivanov',      # Отображаемое имя
+                'picture': 'https://...'    # URL аватара
+            },
+            'expires_in': 3599              # Время жизни access_token в секундах
+        }
 
         Raises:
-            AuthServiceException: Если обмен не удался.
+            OAuthAuthenticationException: Если возникла сетевая ошибка при подключении к Google.
+            OAuthProviderException: Если Google вернул ошибку (например, неверный code).
         """
         max_retries = 3
         base_delay = 1.0
